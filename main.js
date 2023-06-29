@@ -9,16 +9,32 @@ Copyright (C) 2023 Tuukka Lindroos
 
 const { createBluetooth } = require('node-ble');
 const config = require('config');
-const { ParseRuuvi } = require('./ruuvitagparser');
-var mqtt = require('mqtt');
+const RuuviTag =  require("./ruuvitag")
+
+const mqtt = require('mqtt');
 
 let latestSequencePerDevice = new Map();
 
+let connectedRuuvis = new Array();
+
 async function discoverRuuvis(adapter, mqttclient, scanrate)
 {
-   const ruuviTags = config.get("ruuvitags");
+   const ruuviTagConfs = config.get("ruuvitags");
 
-   for (const ruuviTag of ruuviTags) {
+   for (const ruuviTagconf of ruuviTagConfs) {
+
+      const ruuvi = new RuuviTag(ruuviTagconf.name, ruuviTagconf.mac, {timeout: 10000, scanrate: scanrate});
+      ruuvi.on("connected", async (connectedRuuvi) => await performHADiscovery(connectedRuuvi, mqttclient));
+      ruuvi.on("updated", async (sensorData) => await SendUpdateToHA(sensorData, mqttclient));
+
+      if(await ruuvi.initRuuviTag(adapter))
+      {
+         connectedRuuvis.push(ruuvi);
+      }
+         
+
+      
+      /*
       let device = null;
       try {
          device = await adapter.waitDevice(ruuviTag.mac); //await adapter.getDevice(ruuviTag.mac);
@@ -34,55 +50,6 @@ async function discoverRuuvis(adapter, mqttclient, scanrate)
          const data = manufacturerData;
          sensorData = ParseRuuvi(data);
 
-         if(!latestSequencePerDevice.has(ruuviTag.mac))
-         {
-            console.log("First contact with ruuvi tag: " + ruuviTag.name + " (" + ruuviTag.mac + ")");
-
-            const temperatureHADiscovery = {
-               name: `${ruuviTag.name}_temperature`,
-               unit_of_measurement: '°C',
-               icon: 'mdi:temperature-celsius',
-               device_class: 'temperature',
-               value_template: '{{ value_json.temperature }}',
-               state_topic: `homeassistant/sensor/${ruuviTag.name}/state`,
-               availability_topic: `homeassistant/sensor/bridge/state`
-            };
-            mqttclient.publish(`homeassistant/sensor/${ruuviTag.name}/temperature/config`, JSON.stringify(temperatureHADiscovery), { retain: true }, null);
-            
-            const humidityHADiscovery = {
-               name: `${ruuviTag.name}_humidity`,
-               unit_of_measurement: '%',
-               icon: 'mdi:water-percent',
-               device_class: 'humidity',
-               value_template: '{{ value_json.humidity }}',
-               state_topic: `homeassistant/sensor/${ruuviTag.name}/state`,
-               availability_topic: `homeassistant/sensor/bridge/state`
-            };
-            mqttclient.publish(`homeassistant/sensor/${ruuviTag.name}/humidity/config`, JSON.stringify(humidityHADiscovery), { retain: true }, null);
-
-            const pressureHADiscovery = {
-               name: `${ruuviTag.name}_pressure`,
-               unit_of_measurement: 'hPa',
-               icon: 'mdi:car-brake-low-pressure',
-               value_template: '{{ value_json.pressure }}',
-               state_topic: `homeassistant/sensor/${ruuviTag.name}/state`,
-               availability_topic: `homeassistant/sensor/bridge/state`
-            };
-            mqttclient.publish(`homeassistant/sensor/${ruuviTag.name}/pressure/config`, JSON.stringify(pressureHADiscovery), { retain: true }, null);
-
-            const batteryHADiscovery = {
-               name: `${ruuviTag.name}_battery`,
-               unit_of_measurement: 'V',
-               icon: 'mdi:battery',
-               value_template: '{{ value_json.voltage }}',
-               state_topic: `homeassistant/sensor/${ruuviTag.name}/state`,
-               availability_topic: `homeassistant/sensor/bridge/state`
-            };
-            mqttclient.publish(`homeassistant/sensor/${ruuviTag.name}/battery/config`, JSON.stringify(batteryHADiscovery), { retain: true }, null);
-
-            latestSequencePerDevice.set(ruuviTag.mac, 0)
-         } 
-
          // Check if the sequence has been updated
          if(latestSequencePerDevice.get(ruuviTag.mac) != sensorData.seq)
          {
@@ -92,8 +59,60 @@ async function discoverRuuvis(adapter, mqttclient, scanrate)
             mqttclient.publish(`homeassistant/sensor/${ruuviTag.name}/state`, JSON.stringify(sensorData));
             console.log(JSON.stringify(sensorData));
          }
-      }, scanrate)
+      }, scanrate)*/
    }
+}
+
+async function performHADiscovery(ruuviTag, mqttclient)
+{
+   console.log("connected: " + ruuviTag.name)
+   const temperatureHADiscovery = {
+      name: `${ruuviTag.name}_temperature`,
+      unit_of_measurement: '°C',
+      icon: 'mdi:temperature-celsius',
+      device_class: 'temperature',
+      value_template: '{{ value_json.temperature }}',
+      state_topic: `homeassistant/sensor/${ruuviTag.name}/state`,
+      availability_topic: `homeassistant/sensor/bridge/state`
+   };
+   mqttclient.publish(`homeassistant/sensor/${ruuviTag.name}/temperature/config`, JSON.stringify(temperatureHADiscovery), { retain: true }, null);
+   
+   const humidityHADiscovery = {
+      name: `${ruuviTag.name}_humidity`,
+      unit_of_measurement: '%',
+      icon: 'mdi:water-percent',
+      device_class: 'humidity',
+      value_template: '{{ value_json.humidity }}',
+      state_topic: `homeassistant/sensor/${ruuviTag.name}/state`,
+      availability_topic: `homeassistant/sensor/bridge/state`
+   };
+   mqttclient.publish(`homeassistant/sensor/${ruuviTag.name}/humidity/config`, JSON.stringify(humidityHADiscovery), { retain: true }, null);
+
+   const pressureHADiscovery = {
+      name: `${ruuviTag.name}_pressure`,
+      unit_of_measurement: 'hPa',
+      icon: 'mdi:car-brake-low-pressure',
+      value_template: '{{ value_json.pressure }}',
+      state_topic: `homeassistant/sensor/${ruuviTag.name}/state`,
+      availability_topic: `homeassistant/sensor/bridge/state`
+   };
+   mqttclient.publish(`homeassistant/sensor/${ruuviTag.name}/pressure/config`, JSON.stringify(pressureHADiscovery), { retain: true }, null);
+
+   const batteryHADiscovery = {
+      name: `${ruuviTag.name}_battery`,
+      unit_of_measurement: 'V',
+      icon: 'mdi:battery',
+      value_template: '{{ value_json.voltage }}',
+      state_topic: `homeassistant/sensor/${ruuviTag.name}/state`,
+      availability_topic: `homeassistant/sensor/bridge/state`
+   };
+   mqttclient.publish(`homeassistant/sensor/${ruuviTag.name}/battery/config`, JSON.stringify(batteryHADiscovery), { retain: true }, null);
+}
+
+async function SendUpdateToHA(sensorData, mqttclient)
+{
+   mqttclient.publish(`homeassistant/sensor/${sensorData.name}/state`, JSON.stringify(sensorData));
+   console.log(`updated sensor ${sensorData.name}`);
 }
 
 async function main ()

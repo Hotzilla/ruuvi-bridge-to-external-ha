@@ -8,14 +8,18 @@ Copyright (C) 2023 Tuukka Lindroos
 */
 
 const EventEmitter = require('events')
+const { ParseRuuvi } = require('./ruuvitagparser');
 
 ///
 /// Class representing Ruuvi Tag
 /// 
 class RuuviTag extends EventEmitter {
-    constructor(name, macAddress) {
+
+    constructor(name, macAddress, connection) {
+        super()
         this.name = name;
         this.macAddress = macAddress;
+        this.connection = connection;
 
         this.lastSequenceNumber = 0;
 
@@ -28,19 +32,19 @@ class RuuviTag extends EventEmitter {
     async initRuuviTag(btadapter)
     {
         try {
-            this.device = await btadapter.waitDevice(this.macAddress);
+            this.device = await btadapter.waitDevice(this.macAddress, this.connection.timeout);
          } catch(error) {
             console.error(`Ruuvi ${this.name} (${this.macAddress}) is not discovered. ${error}`);
             this.isInError = true;
             return false;
          }
 
-         await refreshSensorData();
+         await this.refreshSensorData();
          this.isInitialized = true;
 
          setInterval(async () => {
-            await refreshSensorData();
-         }, 5000);
+            await this.refreshSensorData();
+         }, this.connection.scanrate);
          return true;
     }
 
@@ -50,16 +54,18 @@ class RuuviTag extends EventEmitter {
         const manufacturer = rawmanu["1177"]["signature"];
         const manufacturerData = rawmanu["1177"]["value"];
         const data = manufacturerData;
-        newData = ParseRuuvi(data);
+        const newData = ParseRuuvi(data);
 
         if(this.lastSequenceNumber == 0)
         {
             // first contact
-            this.emit('connected', value)
+            this.emit('connected', this)
         }
 
         if(this.lastSequenceNumber != newData.seq)
         {
+            this.lastSequenceNumber = newData.seq;
+
             // value has updated
             newData.name = this.name;
             this.sensorData = newData;
@@ -67,3 +73,5 @@ class RuuviTag extends EventEmitter {
         }
     }
 }
+
+module.exports = RuuviTag;
