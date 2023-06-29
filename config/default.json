@@ -9,5 +9,6 @@
         "password": "password",
         "clientId": "ruuvibridge1"
     },
-    "scanrate": 10000
+    "scanrate": 10000,
+    "retryrate": 60000
 }

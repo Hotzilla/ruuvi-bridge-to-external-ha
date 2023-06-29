@@ -36,13 +36,22 @@ class RuuviTag extends EventEmitter {
          } catch(error) {
             console.error(`Ruuvi ${this.name} (${this.macAddress}) is not discovered. ${error}`);
             this.isInError = true;
+            this.isInitialized = false;
             return false;
          }
 
+         if(!await btadapter.isDiscovering()){
+            console.log("BLE discovery stopped, starting it again")
+            await btadapter.startDiscovery();
+         }
          await this.refreshSensorData();
          this.isInitialized = true;
 
          setInterval(async () => {
+            if(!await btadapter.isDiscovering()){
+                console.log("BLE discovery stopped, starting it again")
+                await btadapter.startDiscovery();
+             }
             await this.refreshSensorData();
          }, this.connection.scanrate);
          return true;
@@ -50,8 +59,14 @@ class RuuviTag extends EventEmitter {
 
     async refreshSensorData()
     {
+        if(this.lastComm != null && new Date() - this.lastComm > 40000)
+            console.log("warning: long time between communication");
+
         const rawmanu = await this.device.getManufacturerData();
-        const manufacturer = rawmanu["1177"]["signature"];
+        if(!rawmanu.hasOwnProperty("1177") || !rawmanu["1177"].hasOwnProperty("value"))
+            throw new Error("Device manufacturer data is not valid!");
+
+        //const manufacturer = rawmanu["1177"]["signature"];
         const manufacturerData = rawmanu["1177"]["value"];
         const data = manufacturerData;
         const newData = ParseRuuvi(data);
@@ -65,11 +80,13 @@ class RuuviTag extends EventEmitter {
         if(this.lastSequenceNumber != newData.seq)
         {
             this.lastSequenceNumber = newData.seq;
+            this.prevComm = this.lastComm;
+            this.lastComm = new Date();
 
             // value has updated
             newData.name = this.name;
             this.sensorData = newData;
-            this.emit('updated', this.sensorData)
+            this.emit('updated', this, this.sensorData)
         }
     }
 }
