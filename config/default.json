@@ -1,0 +1,13 @@
+{
+    "ruuvitags": [
+        {"name": "livingroom",  "mac": "AA:BB:CC:DD:EE:FF" },
+        {"name": "bedroom",     "mac": "FF:EE:DD:CC:BB:AA" }
+    ],
+    "mqtt": {
+        "host": "mqtt://192.168.1.1:1883",
+        "username": "user",
+        "password": "password",
+        "clientId": "ruuvibridge1"
+    },
+    "scanrate": 10000
+}

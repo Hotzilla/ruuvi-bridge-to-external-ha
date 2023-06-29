@@ -1,0 +1,12 @@
+{
+  "name": "ruuvi-bridge-to-external-ha",
+  "version": "1.0.0",
+  "main": "main.js",
+  "description": "A RuuviTag -> Rasp -> external HA",
+  "dependencies": {
+    "binary-parser": "^2.2.1",
+    "config": "^3.3.9",
+    "mqtt": "^4.3.7",
+    "node-ble": "github:arolgroup/node-ble#main"
+  }
+}
