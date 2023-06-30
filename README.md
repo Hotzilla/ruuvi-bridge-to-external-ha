@@ -14,3 +14,11 @@
   </policy>
 </busconfig>
 ```
+
+sudo cp systemd-ruuvi-bridge-to-external-ha.service /etc/systemd/system/
+sudo nano /etc/systemd/system/systemd-ruuvi-bridge-to-external-ha.service
+sudo systemctl daemon-reload
+sudo systemctl start systemd-ruuvi-bridge-to-external-ha.service
+sudo systemctl enable systemd-ruuvi-bridge-to-external-ha.service
+sudo systemctl restart systemd-ruuvi-bridge-to-external-ha.service
+sudo systemctl status systemd-ruuvi-bridge-to-external-ha.service
